@@ -1,4 +1,7 @@
-.env
+﻿.env
 node_modules
 *.log
 .DS_Store
+
+# 本地部署覆盖（含端口、路径等与本机相关的设置），不进版本库
+docker-compose.override.yml
