@@ -1,0 +1,34 @@
+# edge 层：只负责 TLS 终结和反向代理，不跑业务
+#
+# 主机名/IP 来自环境变量 SITE_HOST（.env 或 setup.sh 自动填入）。
+#
+# 两个关键点：
+#   1) default_sni —— 用 IP 访问时客户端不发 SNI，没有这行 Caddy 选不出证书
+#   2) tls internal —— Let's Encrypt 不给纯 IP 签证书，只能用内部 CA
+
+{
+	default_sni {$SITE_HOST:localhost}
+}
+
+{$SITE_HOST:localhost}:8443 {
+	tls internal
+
+	encode gzip zstd
+
+	# 手机/其他设备安装根证书用：直接访问 /ca.crt 下载
+	handle /ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition "attachment; filename=liveqr-root.crt"
+		file_server
+	}
+
+	# 同一个 compose 网络里，直接用 service 名访问
+	handle {
+		reverse_proxy app:3000 {
+			# WebSocket 需要保持连接不被缓冲
+			flush_interval -1
+		}
+	}
+}

@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live QRCode · 观看端</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="mask-icon" href="/favicon.svg" color="#2563EB">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  .hidden { display: none !important; }
+  body {
+    margin: 0; min-height: 100vh; background: #14161a; color: #e6e8ec;
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px;
+  }
+  main { width: min(560px, 100%); }
+  h1 { font-size: 20px; margin: 0 0 16px; font-weight: 600; }
+  .card { background: #1c1f26; border: 1px solid #2a2e37; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  @media (max-width: 380px) {
+    .row { grid-template-columns: minmax(0, 1fr); }
+    button { width: 100%; }
+  }
+  input {
+    width: 100%; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid #2a2e37;
+    background: #14161a; color: #e6e8ec; font: 600 18px/1.2 ui-monospace, Consolas, monospace;
+    letter-spacing: 2px; text-align: center;
+  }
+  @media (max-width: 380px) {
+    input { font-size: 16px; letter-spacing: 1px; }
+  }
+  input:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
+  button {
+    padding: 10px 16px; border-radius: 8px; border: 1px solid #2a2e37; background: #232833;
+    color: #e6e8ec; font: inherit; cursor: pointer; white-space: nowrap;
+  }
+  button:hover:not(:disabled) { background: #2b3140; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: #2563eb; border-color: #2563eb; }
+  #status { font-size: 13px; color: #8b93a1; margin: 10px 0 0; min-height: 20px; }
+  #status.ok { color: #4ade80; }
+  #status.err { color: #f87171; }
+  .qr-wrap { display: flex; justify-content: center; padding: 16px; background: #fff; border-radius: 12px; }
+  .qr-wrap canvas, .qr-wrap img { display: block; width: 100%; max-width: 400px; height: auto; }
+  .placeholder {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    color: #8b93a1; text-align: center; padding: 48px 12px;
+  }
+  .placeholder svg { width: 48px; height: 48px; opacity: .45; }
+  .placeholder .waiting-title { font-size: 15px; color: #c7ccd6; }
+  .placeholder .waiting-sub { font-size: 12px; }
+
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    text-decoration: none; color: inherit; padding: 2px 6px 2px 2px; border-radius: 10px;
+    transition: background .15s;
+  }
+  .brand:hover { background: #1c1f26; }
+  .brand-icon {
+    width: 32px; height: 32px; flex: 0 0 32px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: rgba(34,197,94,.14); color: #4ade80;
+  }
+  .brand-icon svg { width: 19px; height: 19px; }
+  .brand .t { font-size: 18px; font-weight: 600; }
+
+  .history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .history-head .label { color: #8b93a1; font-size: 12px; }
+  .history-head .count { color: #8b93a1; font-size: 12px; }
+  .history {
+    list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .history li {
+    background: #14161a; border: 1px solid #232833; border-radius: 8px; padding: 8px 10px;
+    display: flex; gap: 10px; align-items: baseline; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .history li:hover { border-color: #2f3b52; background: #171c26; }
+  .history li.active { border-color: #2563eb; background: #16203a; }
+  .history li .t { color: #6b7280; font-size: 11px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+  .history li .x { color: #d7dbe3; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .pin {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-bottom: 10px; padding: 7px 10px; border-radius: 8px; font-size: 12px;
+    background: rgba(234,179,8,.12); border: 1px solid rgba(234,179,8,.35); color: #facc15;
+  }
+  .pin button {
+    padding: 4px 10px; font-size: 12px; border-radius: 6px;
+    background: #a16207; border-color: #a16207; color: #fff;
+  }
+  .pin button:hover { background: #854d0e; }
+
+  /* ───────── 桌面端：放宽 + 双栏，手机端（<900px）完全不受影响 ───────── */
+  .layout { display: block; }
+
+  @media (min-width: 900px) {
+    body {
+      padding: 44px 40px 56px;
+      background: radial-gradient(1200px 520px at 50% -12%, #17203a 0%, #14161a 62%) fixed, #14161a;
+    }
+    main { width: min(1180px, 100%); }
+
+    .brand { gap: 12px; }
+    .brand-icon { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 13px; }
+    .brand-icon svg { width: 23px; height: 23px; }
+    .brand .t { font-size: 23px; }
+
+    .card { padding: 24px; border-radius: 18px; margin-bottom: 22px; }
+    .code-card .row { max-width: 540px; }
+    .code-card input { font-size: 20px; padding: 13px 16px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+      gap: 22px;
+      align-items: stretch;
+    }
+    .layout > .card {
+      margin-bottom: 0;
+      display: flex; flex-direction: column;
+      min-height: 520px;
+      max-height: calc(100vh - 250px);
+    }
+
+    /* 桌面端不要那块大白底：让二维码自己带白底，卡片里留白更通透 */
+    .qr-wrap {
+      padding: 0; border-radius: 0; flex: 1;
+      background: transparent; align-items: center;
+    }
+    .qr-wrap canvas, .qr-wrap img {
+      max-width: min(100%, 600px);
+      background: #fff;
+      padding: 22px;
+      border-radius: 16px;
+    }
+
+    .history { flex: 1; max-height: none; }
+    .history li { padding: 10px 12px; }
+    .history li .x { font-size: 14px; }
+    .meta { font-size: 13px; margin-top: 14px; }
+  }
+
+  @media (min-width: 1400px) {
+    main { width: min(1320px, 100%); }
+    .qr-wrap { padding: 32px; }
+  }
+  .meta { color: #8b93a1; font-size: 12px; text-align: center; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="brand" href="/" title="返回首页">
+    <span class="brand-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2.8 11.6 L12 4 L21.2 11.6"/>
+        <path d="M5 11.3 V18 Q5 20.6 7.6 20.6 H16.4 Q19 20.6 19 18 V11.3"/>
+        <path d="M9.8 20.6 V15.7 Q9.8 13.2 12 13.2 Q14.2 13.2 14.2 15.7 V20.6"/>
+      </svg>
+    </span>
+    <span class="t">观看端</span>
+  </a>
+
+  <section class="card code-card">
+    <div class="row">
+      <input id="code" inputmode="numeric" maxlength="12" placeholder="分享码" autocomplete="off">
+      <button class="primary" id="connectBtn">连接</button>
+    </div>
+    <p id="status">输入上传端显示的分享码</p>
+  </section>
+
+  <div class="layout">
+  <section class="card">
+    <div class="pin hidden" id="pinBar">
+      <span id="pinText">正在查看历史记录</span>
+      <button id="backLatest">回到最新</button>
+    </div>
+    <div class="qr-wrap" id="qrWrap">
+      <img id="qrImg" class="hidden" alt="二维码">
+      <div class="placeholder" id="waiting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>
+        </svg>
+        <div class="waiting-title">等待扫描端</div>
+        <div class="waiting-sub">上传端扫码或输入内容后，这里会显示二维码</div>
+      </div>
+    </div>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <section class="card hidden" id="historyCard">
+    <div class="history-head">
+      <span class="label">历史记录</span>
+      <span class="count" id="histCount">0 条</span>
+    </div>
+    <ul class="history" id="history"></ul>
+  </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const codeEl = $('code'), connectBtn = $('connectBtn'), statusEl = $('status');
+  const qrWrap = $('qrWrap'), metaEl = $('meta');
+  const qrImg = $('qrImg'), waiting = $('waiting'), historyCard = $('historyCard');
+  const histList = $('history'), histCount = $('histCount');
+  const pinBar = $('pinBar'), pinText = $('pinText'), backLatest = $('backLatest');
+
+  // 记下"等待扫描端"的原始内容，换频道/过期后能原样恢复
+  const WAITING_HTML = waiting.innerHTML;
+
+  let ws = null;
+  let attempt = 0;
+  let manualClose = false;
+  let currentCode = '';
+  let currentText = '';
+  let messages = [];
+  let selectedSeq = null;
+  let renderTimer = null;
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = kind || '';
+  }
+
+  // 二维码由服务端渲染成 SVG。先预加载到内存，加载完再换 src，
+  // 这样旧图会一直显示到新图就绪，中间不会出现白屏/闪烁。
+  // seq 为 null 时显示最新内容；否则按序号向服务端要那一张历史二维码。
+  function qrUrl(seq) {
+    const params = new URLSearchParams();
+    if (seq !== null && seq !== undefined) params.set('seq', String(seq));
+    params.set('t', String(Date.now()));
+    return `/api/channel/${currentCode}/qr.svg?${params.toString()}`;
+  }
+
+  function render(text, seq, at) {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(() => {
+      const url = qrUrl(seq);
+      const pre = new Image();
+      pre.onload = () => {
+        qrImg.src = url;
+        qrImg.classList.remove('hidden');
+        waiting.classList.add('hidden');
+      };
+      pre.onerror = () => {
+        qrImg.classList.add('hidden');
+        waiting.classList.remove('hidden');
+        waiting.innerHTML = seq === null || seq === undefined
+          ? '<div class="waiting-title">二维码生成失败</div><div class="waiting-sub">文本可能过长，或包含不支持的字符</div>'
+          : '<div class="waiting-title">这条记录已不可用</div><div class="waiting-sub">历史记录最多保留 200 条，旧的已被清理</div>';
+      };
+      pre.src = url;
+      const when = new Date(at || Date.now()).toLocaleTimeString();
+      metaEl.textContent = `${text.length} 字符 · ${seq === null || seq === undefined ? '更新于' : '记录于'} ${when}`;
+    }, 60);
+  }
+
+  function selectHistory(seq) {
+    const item = messages.find((m) => m.seq === seq);
+    if (!item) return;
+    selectedSeq = seq;
+    pinBar.classList.remove('hidden');
+    pinText.textContent = '正在查看 ' + new Date(item.at).toLocaleTimeString() + ' 的记录';
+    render(item.text, seq, item.at);
+    renderHistory();
+  }
+
+  function backToLatest() {
+    selectedSeq = null;
+    pinBar.classList.add('hidden');
+    const latest = messages[0];
+    if (latest) render(latest.text, null, latest.at);
+    renderHistory();
+  }
+
+  // 历史记录：最新的在最上面，最多 200 条
+  function renderHistory() {
+    if (!messages.length) {
+      historyCard.classList.add('hidden');
+      return;
+    }
+    historyCard.classList.remove('hidden');
+    histCount.textContent = messages.length + ' 条';
+    histList.innerHTML = '';
+    for (const m of messages) {
+      const li = document.createElement('li');
+      if (m.seq === selectedSeq) li.classList.add('active');
+      li.dataset.seq = String(m.seq);
+      li.title = '点击查看这张二维码';
+      const t = document.createElement('span');
+      t.className = 't';
+      t.textContent = new Date(m.at || Date.now()).toLocaleTimeString();
+      const x = document.createElement('span');
+      x.className = 'x';
+      x.textContent = m.text;
+      li.append(t, x);
+      li.addEventListener('click', () => selectHistory(m.seq));
+      histList.appendChild(li);
+    }
+  }
+
+  function openSocket() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    setStatus(attempt > 0 ? `重连中（第 ${attempt} 次）…` : '连接中…');
+
+    ws = new WebSocket(`${proto}://${location.host}/ws?code=${currentCode}`);
+
+    ws.onopen = () => {
+      attempt = 0;
+      setStatus('已连接，等待上传端数据', 'ok');
+    };
+
+    ws.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      if (msg.type === 'init') {
+        selectedSeq = null;
+        pinBar.classList.add('hidden');
+        messages = Array.isArray(msg.history) ? msg.history.slice().reverse() : [];
+        renderHistory();
+        if (msg.text) { currentText = msg.text; render(msg.text, null, msg.at); setStatus('已连接', 'ok'); }
+        else setStatus('已连接，等待扫描端上传', 'ok');
+      } else if (msg.type === 'update') {
+        currentText = msg.text;
+        messages.unshift({ seq: msg.seq, text: msg.text, at: msg.at || Date.now() });
+        if (messages.length > 200) messages.pop();
+        renderHistory();
+        if (selectedSeq === null) render(msg.text, null, msg.at);
+        setStatus(selectedSeq === null ? '已接收最新内容' : '有新内容（正在查看历史）', selectedSeq === null ? 'ok' : '');
+      } else if (msg.type === 'expired') {
+        // 注意：不能清空 qrWrap，否则 qrImg / waiting 的引用会失效
+        manualClose = true;
+        selectedSeq = null;
+        pinBar.classList.add('hidden');
+        qrImg.classList.add('hidden');
+        waiting.classList.remove('hidden');
+        waiting.innerHTML = '<div class="waiting-title">频道已过期</div><div class="waiting-sub">请让上传端新建频道后重新连接</div>';
+        setStatus('频道已过期，请让上传端新建频道', 'err');
+      }
+    };
+
+    ws.onerror = () => setStatus('连接出错', 'err');
+
+    ws.onclose = () => {
+      if (manualClose) return;
+      attempt += 1;
+      if (attempt > 6) {
+        setStatus('连接失败，请核对分享码，或让上传端重新分享', 'err');
+        return;
+      }
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 30000);
+      setStatus(`连接断开，${Math.round(delay / 1000)} 秒后重连（第 ${attempt} 次）…`, 'err');
+      setTimeout(() => { if (!manualClose) openSocket(); }, delay);
+    };
+  }
+
+  async function connect() {
+    const code = codeEl.value.trim();
+    if (!/^\d{4,12}$/.test(code)) {
+      setStatus('分享码应为 4–12 位数字', 'err');
+      return;
+    }
+
+    // 换了一个码：先清掉上一个频道的内容，避免张冠李戴
+    if (code !== currentCode) {
+      messages = [];
+      selectedSeq = null;
+      pinBar.classList.add('hidden');
+      renderHistory();
+      qrImg.classList.add('hidden');
+      waiting.classList.remove('hidden');
+      waiting.innerHTML = WAITING_HTML;
+      metaEl.textContent = '';
+      setStatus('连接中…');
+    }
+
+    manualClose = false;
+    currentCode = code;
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+      ws = null;
+    }
+    attempt = 0;
+    setStatus('连接中…');
+
+    // 先确认频道存在，避免对不存在的码无限重连
+    let res = null;
+    try { res = await fetch(`/api/channel/${code}`); } catch { res = null; }
+    if (res && res.status === 429) {
+      manualClose = true;
+      setStatus('查询太频繁，请一分钟后再试', 'err');
+      return;
+    }
+    if (res && !res.ok) {
+      manualClose = true;
+      setStatus('频道不存在或已过期，请核对分享码', 'err');
+      return;
+    }
+    openSocket();
+  }
+
+  connectBtn.addEventListener('click', connect);
+  backLatest.addEventListener('click', backToLatest);
+  codeEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+
+  const initial = new URLSearchParams(location.search).get('code');
+  if (initial && /^\d{4,12}$/.test(initial)) {
+    codeEl.value = initial;
+    connect();
+  }
+})();
+</script>
+</body>
+</html>

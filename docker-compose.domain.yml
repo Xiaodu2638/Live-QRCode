@@ -1,0 +1,14 @@
+# 域名模式附加配置：用 80/443 对外，交给 Let's Encrypt
+#
+#   docker compose -f docker-compose.yml -f docker-compose.domain.yml up -d
+#
+# setup.sh 选「域名访问」时会自动带上这个文件。
+# 它同时替换端口和 Caddyfile，所以不需要再改 .env 里的 CADDY_MODE。
+services:
+  edge:
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes: !override
+      - ./Caddyfile.domain:/etc/caddy/Caddyfile:ro
+      - edge-data:/data

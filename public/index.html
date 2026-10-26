@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<title>Live QRCode</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="mask-icon" href="/favicon.svg" color="#2563EB">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: #0b0d10; color: #e6e8ec;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; align-items: center; justify-content: center; overflow-y: auto;
+    padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    background: radial-gradient(1200px 600px at 50% -10%, #16203a 0%, #0b0d10 60%);
+  }
+  .home { width: min(520px, 100%); text-align: center; }
+  .brand svg { width: 80px; height: 80px; }
+  .brand h1 { margin: 16px 0 8px; font-size: 48px; line-height: 1.05; letter-spacing: -1px; }
+  .brand p { margin: 0 0 32px; color: #8b93a1; font-size: 18px; }
+
+  .cards { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 620px) { .cards { grid-template-columns: 1fr 1fr; } }
+
+  .card {
+    display: block; width: 100%; text-align: center; cursor: pointer;
+    background: #141922; border: 1px solid #232a36; border-radius: 18px; padding: 32px 20px;
+    color: inherit; font: inherit; text-decoration: none;
+    transition: transform .15s, border-color .15s, background .15s;
+  }
+  .card:hover { background: #172030; border-color: #2f3b52; transform: translateY(-2px); }
+  .card:active { transform: scale(.985); }
+  .card .icon {
+    width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center;
+    margin: 0 auto 18px;
+  }
+  .card .icon svg { width: 32px; height: 32px; }
+  .card.upload .icon { background: rgba(34,197,94,.14); color: #4ade80; }
+  .card.view .icon { background: rgba(59,130,246,.14); color: #60a5fa; }
+  .card h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+  .card p { margin: 0 auto; max-width: 100%; color: #8b93a1; font-size: 14px; line-height: 1.6; }
+
+  .alt {
+    display: inline-block; margin-top: 16px; padding: 9px 14px; border-radius: 10px;
+    border: 1px solid #2a2f38; color: #c7ccd6; text-decoration: none; font-size: 14px;
+    background: transparent;
+  }
+  .alt:hover { background: #1d222b; }
+</style>
+</head>
+<body>
+  <div class="home">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect x="4" y="4" width="56" height="56" rx="14" fill="#2563EB"/>
+        <rect x="13" y="13" width="12" height="12" rx="2.5" fill="#fff"/>
+        <rect x="16" y="16" width="6" height="6" rx="1" fill="#2563EB"/>
+        <rect x="39" y="13" width="12" height="12" rx="2.5" fill="#fff"/>
+        <rect x="42" y="16" width="6" height="6" rx="1" fill="#2563EB"/>
+        <rect x="13" y="39" width="12" height="12" rx="2.5" fill="#fff"/>
+        <rect x="16" y="42" width="6" height="6" rx="1" fill="#2563EB"/>
+        <circle cx="45" cy="45" r="3.2" fill="#22C55E"/>
+        <path d="M35 35l7-7" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M37 27h6v6" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>Live QR</h1>
+      <p>扫码上传，实时同步到观看端</p>
+    </div>
+
+    <div class="cards">
+      <a class="card upload" href="/upload">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.66-.89l.81-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.66.89l.81 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+            <circle cx="12" cy="13" r="3"/>
+          </svg>
+        </div>
+        <h2>扫码上传</h2>
+        <p>打开摄像头扫描二维码，内容实时推送到观看端</p>
+      </a>
+
+      <a class="card view" href="/view">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.04 12.32a1 1 0 010-.64C3.42 7.51 7.36 4.5 12 4.5s8.57 3.01 9.96 7.18a1 1 0 010 .64C20.57 16.49 16.64 19.5 12 19.5s-8.57-3.01-9.96-7.18z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <h2>观看端</h2>
+        <p>输入或接收分享码，实时查看并渲染二维码</p>
+      </a>
+    </div>
+
+    <a class="alt" href="/upload?mode=text">不扫码，直接输入文本 →</a>
+  </div>
+</body>
+</html>

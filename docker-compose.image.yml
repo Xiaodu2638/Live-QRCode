@@ -1,0 +1,11 @@
+# 用已发布的镜像部署（不本地构建、不挂载源码）
+#
+#   PUBLISH_IMAGE=registry.cn-hangzhou.aliyuncs.com/your-ns/live-qrcode:latest \
+#   docker compose -f docker-compose.yml -f docker-compose.image.yml up -d
+#
+# 效果：app 服务直接用镜像里的代码，宿主机上不需要 server.js / public/
+services:
+  app:
+    build: !reset null
+    image: ${PUBLISH_IMAGE:?请设置 PUBLISH_IMAGE 环境变量，例如 registry.example.com/ns/live-qrcode:latest}
+    volumes: !reset []

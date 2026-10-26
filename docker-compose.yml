@@ -1,0 +1,47 @@
+# 项目名固定，不随目录名变化（换目录不会丢证书卷）
+name: live-qrcode
+
+services:
+  app:
+    build: .
+    # 调试直连入口。不想暴露就把这段 ports 删掉，只走 edge
+    ports:
+      - "${HOST_PORT:-48080}:3000"
+    volumes:
+      # 代码和页面挂载：改宿主机文件即可，不用重新 build
+      #   改 public/*.html → 浏览器刷新即生效
+      #   改 server.js    → docker compose restart app
+      - ./server.js:/app/server.js:ro
+      - ./public:/app/public:ro
+    environment:
+      PORT: ${PORT:-3000}
+      CHANNEL_TTL_SECONDS: ${CHANNEL_TTL_SECONDS:-1800}
+      CLEANUP_INTERVAL_SECONDS: ${CLEANUP_INTERVAL_SECONDS:-60}
+      UPLOAD_RATE_LIMIT: ${UPLOAD_RATE_LIMIT:-2}
+      MAX_VIEWERS_PER_CHANNEL: ${MAX_VIEWERS_PER_CHANNEL:-50}
+      MAX_TEXT_LENGTH: ${MAX_TEXT_LENGTH:-2000}
+      SHARE_CODE_LENGTH: ${SHARE_CODE_LENGTH:-8}
+      MAX_CHANNELS: ${MAX_CHANNELS:-1000}
+      MAX_HISTORY: ${MAX_HISTORY:-200}
+      VERIFY_RATE_LIMIT: ${VERIFY_RATE_LIMIT:-60}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+    restart: unless-stopped
+
+  edge:
+    image: caddy:2-alpine
+    ports:
+      - "${EDGE_PORT:-8443}:8443"
+    environment:
+      SITE_HOST: ${SITE_HOST:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      # IP 模式固定用 Caddyfile.edge；
+      # 域名模式由 docker-compose.domain.yml 整个替换掉这一项
+      - ./Caddyfile.edge:/etc/caddy/Caddyfile:ro
+      - edge-data:/data
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  edge-data:
