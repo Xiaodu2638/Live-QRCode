@@ -332,7 +332,9 @@
     const text = `分享码 ${S.code}\n${url}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Live QR 分享码', text, url });
+        // 注意只传 text：text 里已经包含链接，
+        // 再传 url 字段会被分享面板拼接成两条一样的链接
+        await navigator.share({ title: 'Live QRCode 分享码', text });
         return;
       } catch (err) {
         if (err && err.name === 'AbortError') return;   // 用户取消，不提示

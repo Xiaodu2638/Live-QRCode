@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<title>Live QRCode · 扫码端</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="mask-icon" href="/favicon.svg" color="#2563EB">
+<style>
+  :root { color-scheme: dark; --green:#22c55e; --red:#ef4444; --yellow:#eab308; --blue:#3b82f6; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: #0b0d10; color: #e6e8ec; overflow: hidden;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  .hidden { display: none !important; }
+  .screen { position: fixed; inset: 0; }
+
+  /* ═══════════ 首页：选择模式 ═══════════ */
+  #homeMode {
+    background: radial-gradient(1200px 600px at 50% -10%, #16203a 0%, #0b0d10 60%);
+    display: flex; align-items: center; justify-content: center; overflow-y: auto;
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .home { width: min(520px, 100%); text-align: center; }
+  .brand svg { width: 80px; height: 80px; }
+  .brand h1 { margin: 16px 0 8px; font-size: 48px; line-height: 1.05; letter-spacing: -1px; }
+  .brand p { margin: 0 0 32px; color: #8b93a1; font-size: 18px; }
+  .cards { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 620px) { .cards { grid-template-columns: 1fr 1fr; } }
+  .card {
+    display: block; width: 100%; text-align: center; cursor: pointer;
+    background: #141922; border: 1px solid #232a36; border-radius: 18px; padding: 32px 20px;
+    color: inherit; font: inherit; transition: transform .15s, border-color .15s, background .15s;
+  }
+  .card:hover { background: #172030; border-color: #2f3b52; transform: translateY(-2px); }
+  .card:active { transform: scale(.985); }
+  .card .icon {
+    width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center;
+    margin: 0 auto 18px;
+  }
+  .card .icon svg { width: 32px; height: 32px; }
+  .card.scan .icon { background: rgba(34,197,94,.14); color: #4ade80; }
+  .card.view .icon { background: rgba(59,130,246,.14); color: #60a5fa; }
+  .card h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+  .card p { margin: 0 auto; max-width: 100%; color: #8b93a1; font-size: 14px; line-height: 1.6; }
+  .home-foot { margin-top: 26px; color: #6b7280; font-size: 12px; }
+  .home-foot b { color: #9aa3b2; font-family: ui-monospace, Consolas, monospace; letter-spacing: 2px; }
+
+  /* ═══════════ 扫码页 ═══════════ */
+  #camMode { display: flex; flex-direction: column; background: #000; }
+  .stage { position: relative; flex: 1; overflow: hidden; background: #000; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; gap: 10px;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,0));
+  }
+  .icon-btn {
+    width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center;
+    border-radius: 12px; border: 0; background: rgba(20,22,26,.72); color: #4ade80;
+    backdrop-filter: blur(8px); cursor: pointer; padding: 0;
+  }
+  .icon-btn:hover { background: rgba(40,45,55,.9); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px; font-size: 13px;
+    background: rgba(20,22,26,.72); backdrop-filter: blur(8px);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; }
+  .dot.on { background: var(--green); animation: ping 1.8s infinite; }
+  .dot.warn { background: var(--yellow); }
+  .dot.err { background: var(--red); }
+  @keyframes ping {
+    0% { box-shadow: 0 0 0 0 rgba(34,197,94,.55); }
+    70% { box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
+  .spacer { flex: 1; }
+
+  .frame { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; pointer-events: none; }
+  .frame .box { position: relative; width: min(64vw, 260px); aspect-ratio: 1; }
+  .frame .box span { position: absolute; width: 34px; height: 34px; border: 3px solid var(--green); border-radius: 10px; }
+  .frame .box span:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+  .frame .box span:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+  .frame .box span:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+  .frame .box span:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+  .scanline {
+    position: absolute; left: 4%; right: 4%; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: sweep 2.4s ease-in-out infinite;
+  }
+  @keyframes sweep { 0%,100% { top: 6%; opacity: .2; } 50% { top: 92%; opacity: 1; } }
+  .frame .box.hit { animation: hit .5s ease-out; }
+  @keyframes hit {
+    0% { box-shadow: 0 0 0 0 rgba(34,197,94,.65); }
+    100% { box-shadow: 0 0 0 22px rgba(34,197,94,0); }
+  }
+
+  .center-note {
+    position: absolute; inset: 0; z-index: 15; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 12px; padding: 32px; text-align: center;
+    background: rgba(0,0,0,.55);
+  }
+  .center-note h2 { margin: 0; font-size: 17px; font-weight: 600; }
+  .center-note p { margin: 0; color: #b6bcc8; font-size: 13px; max-width: 32em; }
+  .spinner {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.25); border-top-color: #fff;
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .panel {
+    position: relative; z-index: 20; background: #14161a; border-top: 1px solid #23272f;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .row-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .label { color: #8b93a1; font-size: 12px; white-space: nowrap; }
+  .code { font: 700 21px/1 ui-monospace, Consolas, monospace; letter-spacing: .16em; color: var(--green); }
+  .stats { display: flex; align-items: center; gap: 12px; color: #9aa3b2; font-size: 12px; flex-wrap: wrap; min-width: 0; }
+  .stats b { color: #e6e8ec; font-weight: 600; }
+  .last { font-size: 11px; color: #8b93a1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .last.ok { color: #4ade80; }
+  .last.warn { color: #facc15; }
+  .last.err { color: #f87171; }
+
+  .actions { display: flex; gap: 6px; flex-wrap: nowrap; flex: 0 0 auto; }
+  button, a.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 14px; border-radius: 10px; border: 1px solid #2a2f38; background: #1d222b;
+    color: #e6e8ec; font: inherit; cursor: pointer; text-decoration: none; transition: background .15s;
+  }
+  button.compact, a.btn.compact { padding: 7px 12px; font-size: 13px; border-radius: 9px; }
+  button:hover:not(:disabled), a.btn:hover { background: #262c37; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary, a.btn.primary { background: #2563eb; border-color: #2563eb; }
+  button.primary:hover:not(:disabled), a.btn.primary:hover { background: #1d4ed8; }
+  button.danger { background: #b91c1c; border-color: #b91c1c; }
+  button.danger:hover:not(:disabled) { background: #991b1b; }
+  button.ghost, a.btn.ghost { background: transparent; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 42%; transform: translateX(-50%) translateY(8px);
+    z-index: 40; padding: 10px 16px; border-radius: 10px; font-size: 13px;
+    background: rgba(20,22,26,.92); border: 1px solid #2a2f38; opacity: 0;
+    transition: opacity .18s, transform .18s; pointer-events: none; max-width: 80vw; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.ok { border-color: #15803d; color: #86efac; }
+  #toast.err { border-color: #b91c1c; color: #fca5a5; }
+
+  /* ═══════════ 文本输入 ═══════════ */
+  #textMode {
+    overflow-y: auto; background: #0f1115;
+    padding: calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+    display: flex; justify-content: center;
+  }
+  #textMode .wrap { width: min(680px, 100%); }
+  #textMode h1 { font-size: 18px; margin: 0 0 14px; }
+  .card-panel { background: #171a20; border: 1px solid #242931; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  textarea {
+    width: 100%; min-height: 130px; resize: vertical; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid #242931; background: #0f1115; color: #e6e8ec; font: inherit;
+  }
+  textarea:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 扫码页 ═══════════ -->
+<section id="camMode" class="screen hidden">
+  <div class="stage">
+    <video id="video" autoplay playsinline muted></video>
+
+    <div class="frame hidden" id="frame">
+      <div class="box">
+        <span></span><span></span><span></span><span></span>
+        <div class="scanline"></div>
+      </div>
+    </div>
+
+    <div class="topbar">
+      <button class="icon-btn" id="backHome" title="返回首页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2.8 11.6 L12 4 L21.2 11.6"/>
+          <path d="M5 11.3 V18 Q5 20.6 7.6 20.6 H16.4 Q19 20.6 19 18 V11.3"/>
+          <path d="M9.8 20.6 V15.7 Q9.8 13.2 12 13.2 Q14.2 13.2 14.2 15.7 V20.6"/>
+        </svg>
+      </button>
+      <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">准备中…</span></div>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="center-note" id="centerNote">
+      <div class="spinner" id="spinner"></div>
+      <h2 id="noteTitle">正在启动摄像头…</h2>
+      <p id="noteText">首次使用需要允许浏览器访问摄像头</p>
+      <button class="primary hidden" id="noteBtn">重试</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="row-left">
+        <span class="label">分享码</span>
+        <span class="code" id="codeBig">--------</span>
+      </div>
+      <div class="actions">
+        <button class="primary compact" id="shareBtn">分享</button>
+        <button class="compact" id="newChannel">新建</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="stats">
+        <span>上传 <b id="statUploads">0</b></span>
+        <span>观看 <b id="statViewers">0</b></span>
+        <span id="statResult" class="last"></span>
+      </div>
+      <div class="actions">
+        <button class="ghost compact" id="toText">文本</button>
+        <button class="danger compact" id="stopCam">停止</button>
+      </div>
+    </div>
+
+    <div class="last hidden" id="lastScanned"></div>
+  </div>
+</section>
+
+<!-- ═══════════ 文本输入 ═══════════ -->
+<section id="textMode" class="screen hidden">
+  <div class="wrap">
+    <div class="row" style="margin-bottom:14px">
+      <h1 style="margin:0">文本输入</h1>
+      <div class="actions">
+        <button class="ghost" id="textBack">扫码</button>
+        <button class="ghost" id="textHome">返回</button>
+      </div>
+    </div>
+
+    <div class="card-panel">
+      <div class="row">
+        <div class="row-left">
+          <span class="label">分享码</span>
+          <span class="code" id="codeBig2">--------</span>
+        </div>
+        <div class="actions">
+          <button class="primary" id="shareBtn2">分享</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-panel">
+      <textarea id="text" placeholder="输入或粘贴文本，会自动上传（600ms 防抖）"></textarea>
+      <div class="actions" style="margin-top:10px">
+        <button class="primary" id="sendBtn">立即上传</button>
+        <button id="newChannel2">新建频道</button>
+      </div>
+      <p class="last" id="textStatus" style="margin:10px 0 0"></p>
+    </div>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script src="/vendor/jsQR.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const camMode = $('camMode'), textMode = $('textMode');
+  const video = $('video'), frame = $('frame'), centerNote = $('centerNote');
+  const spinner = $('spinner'), noteTitle = $('noteTitle'), noteText = $('noteText'), noteBtn = $('noteBtn');
+  const statusDot = $('statusDot'), statusText = $('statusText');
+  const codeBig = $('codeBig'), codeBig2 = $('codeBig2');
+  const statUploads = $('statUploads'), statViewers = $('statViewers'), statResult = $('statResult');
+  const lastScannedEl = $('lastScanned'), toastEl = $('toast');
+  const textEl = $('text'), textStatus = $('textStatus');
+  const viewLink = $('viewLink');
+
+  const S = {
+    code: '', token: '',
+    scanning: false,
+    uploads: 0, viewers: 0,
+    lastSent: '', lastScanned: '',
+    pending: null, retryTimer: null,
+  };
+
+  /* ── 通用 ── */
+  let toastTimer = null;
+  function toast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.className = 'show ' + (kind || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = ''; }, 2200);
+  }
+  function setStatus(kind, text) {
+    statusDot.className = 'dot' + (kind ? ' ' + kind : '');
+    statusText.textContent = text;
+  }
+  function setResult(text, kind) {
+    statResult.textContent = text || '';
+    statResult.className = 'last' + (kind ? ' ' + kind : '');
+  }
+  function viewUrl() {
+    return `${location.origin}/view?code=${S.code}`;
+  }
+  function showCode() {
+    const c = S.code || '--------';
+    codeBig.textContent = c;
+    codeBig2.textContent = c;
+  }
+
+  function showMode(name) {
+    camMode.classList.toggle('hidden', name !== 'camera');
+    textMode.classList.toggle('hidden', name !== 'text');
+    if (name !== 'camera') stopCamera();
+  }
+
+  /* ── 分享：手机走系统面板（可发微信/QQ），桌面退回复制 ── */
+  async function share() {
+    if (!S.code) { toast('频道还没准备好', 'err'); return; }
+    const url = viewUrl();
+    const text = `分享码 ${S.code}\n${url}`;
+    if (navigator.share) {
+      try {
+        // 注意只传 text：text 里已经包含链接，
+        // 再传 url 字段会被分享面板拼接成两条一样的链接
+        await navigator.share({ title: 'Live QRCode 分享码', text });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;   // 用户取消，不提示
+        // 其他错误继续走复制兜底
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('链接已复制，粘贴到微信 / QQ 即可', 'ok');
+    } catch {
+      const i = document.createElement('textarea');
+      i.value = text;
+      i.style.position = 'fixed';
+      i.style.opacity = '0';
+      document.body.appendChild(i);
+      i.select();
+      try { document.execCommand('copy'); toast('链接已复制', 'ok'); }
+      catch { toast('复制失败，分享码是 ' + S.code, 'err'); }
+      document.body.removeChild(i);
+    }
+  }
+
+  /* ── 频道：懒创建，点开扫码/文本才真正建 ── */
+  async function ensureChannel() {
+    if (S.code) return true;
+    await createChannel();
+    return !!S.code;
+  }
+
+  async function createChannel() {
+    try {
+      const res = await fetch('/api/channel', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 503) { toast('服务器频道数已达上限，稍后再试', 'err'); return; }
+        toast('创建频道失败：' + (err.error || res.status), 'err');
+        return;
+      }
+      const data = await res.json();
+      S.code = data.code;
+      S.token = data.uploadToken;
+      S.lastSent = '';
+      S.lastScanned = '';          // 新频道要能重新扫同一个码
+      S.uploads = 0; S.viewers = 0;
+      statUploads.textContent = '0'; statViewers.textContent = '0';
+      lastScannedEl.classList.add('hidden');
+      lastScannedEl.textContent = '';
+      setResult('');
+      sessionStorage.setItem('liveqr', JSON.stringify({ code: S.code, token: S.token }));
+      showCode();
+      toast('新频道已创建', 'ok');
+    } catch (err) {
+      toast('创建频道失败：' + err.message, 'err');
+    }
+  }
+
+  async function restoreChannel() {
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem('liveqr') || 'null'); } catch { /* ignore */ }
+    if (!saved || !saved.code) return false;
+    const res = await fetch(`/api/channel/${saved.code}`).catch(() => null);
+    if (!res || !res.ok) return false;
+    S.code = saved.code;
+    S.token = saved.token;
+    showCode();
+    return true;
+  }
+
+  /* ── 上传 ── */
+  async function upload(text, { force = false } = {}) {
+    if (!S.code || !text) return;
+    if (!force && text === S.lastSent) return;   // 内容没变就不重复传
+    try {
+      const res = await fetch(`/api/channel/${S.code}/upload`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-upload-token': S.token },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        S.lastSent = text;
+        S.uploads += 1;
+        S.viewers = data.viewers || 0;
+        statUploads.textContent = S.uploads;
+        statViewers.textContent = S.viewers;
+        setResult('上传成功', 'ok');
+        textStatus.textContent = '上次上传：成功';
+        textStatus.className = 'last ok';
+        if (S.scanning) setStatus('on', '扫描中');
+      } else if (res.status === 429) {
+        setResult('限流，排队重试', 'warn');
+        S.pending = text;
+        clearTimeout(S.retryTimer);
+        S.retryTimer = setTimeout(() => {
+          const t = S.pending; S.pending = null;
+          if (t) upload(t, { force: true });
+        }, 1100);
+      } else if (res.status === 404) {
+        setResult('频道已过期', 'err');
+        setStatus('warn', '已新建频道');
+        await createChannel();
+        toast('频道已过期，已新建；请把新分享码发给观看端', 'err');
+      } else {
+        setResult('上传失败：' + (data.error || res.status), 'err');
+        textStatus.textContent = '上次上传：失败（' + (data.error || res.status) + '）';
+        textStatus.className = 'last err';
+      }
+    } catch (err) {
+      setResult('网络错误', 'err');
+      toast('网络错误：' + err.message, 'err');
+      S.pending = text;
+      clearTimeout(S.retryTimer);
+      S.retryTimer = setTimeout(() => {
+        const t = S.pending; S.pending = null;
+        if (t) upload(t, { force: true });
+      }, 2000);
+    }
+  }
+
+  /* ── 摄像头 ── */
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  const frameBox = document.querySelector('#frame .box');
+  let regionCache = null;
+  let regionAt = 0;
+
+  function showNote(title, text, { spin = false, retry = false } = {}) {
+    centerNote.classList.remove('hidden');
+    noteTitle.textContent = title;
+    noteText.textContent = text;
+    spinner.classList.toggle('hidden', !spin);
+    noteBtn.classList.toggle('hidden', !retry);
+  }
+  function hideNote() { centerNote.classList.add('hidden'); }
+
+  async function startCamera() {
+    if (!window.isSecureContext) {
+      setStatus('warn', '非安全上下文');
+      frame.classList.add('hidden');
+      showNote('无法调用摄像头', '浏览器只在 https:// 或 localhost 下允许摄像头。请用 https 访问，或改用文本输入。');
+      return false;
+    }
+    if (typeof window.jsQR !== 'function') {
+      showNote('扫码库未加载', '/vendor/jsQR.js 加载失败', { retry: true });
+      return false;
+    }
+    setStatus('warn', '启动中…');
+    showNote('正在启动摄像头…', '首次使用需要允许浏览器访问摄像头', { spin: true });
+    try {
+      // 重复点“重试”时先释放上一条流，否则会有多个摄像头会话同时开着
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach((t) => t.stop());
+        video.srcObject = null;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await video.play();
+      hideNote();
+      frame.classList.remove('hidden');
+      S.scanning = true;
+      setStatus('on', '扫描中');
+      requestAnimationFrame(tick);
+      return true;
+    } catch (err) {
+      setStatus('err', '摄像头不可用');
+      frame.classList.add('hidden');
+      showNote('摄像头打开失败', err && err.name === 'NotAllowedError'
+        ? '你拒绝了摄像头权限，可在地址栏左侧的图标里重新允许。'
+        : String(err && err.message ? err.message : err), { retry: true });
+      return false;
+    }
+  }
+
+  function stopCamera() {
+    S.scanning = false;
+    const stream = video.srcObject;
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+  }
+
+  function tick() {
+    if (!S.scanning) return;
+    try {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth) {
+        const now = performance.now();
+        if (now - regionAt > 800) { regionCache = scanRegion(); regionAt = now; }
+
+        let found = null;
+
+        // 1) 先只扫取景框里的那一块
+        if (regionCache && regionCache.sw > 16 && regionCache.sh > 16) {
+          const { sx, sy, sw, sh } = regionCache;
+          canvas.width = Math.round(sw);
+          canvas.height = Math.round(sh);
+          ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+          const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          found = window.jsQR(img.data, img.width, img.height);
+        }
+
+        // 2) 框里没扫到，才退回全画面兜底（比如码还没摆正）
+        if (!found) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          found = window.jsQR(img.data, img.width, img.height);
+        }
+
+        if (found && found.data) {
+          const text = found.data;
+          if (text !== S.lastScanned) {
+            S.lastScanned = text;
+            lastScannedEl.textContent = '最近扫描：' + (text.length > 60 ? text.slice(0, 60) + '…' : text);
+            lastScannedEl.classList.remove('hidden');
+            flashFrame();
+            upload(text);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('scan tick error', err);
+      setResult('解码异常', 'err');
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // 把取景框（DOM 坐标）换算成视频里的像素区域。
+  // video 用了 object-fit: cover，画面会被等比放大并从中心裁切，所以要算缩放和偏移。
+  function scanRegion() {
+    if (!video.videoWidth || !video.videoHeight) return null;
+    const vr = video.getBoundingClientRect();
+    const br = frameBox.getBoundingClientRect();
+    if (!br.width || !br.height || !vr.width || !vr.height) return null;
+
+    const scale = Math.max(vr.width / video.videoWidth, vr.height / video.videoHeight);
+    const offX = (vr.width - video.videoWidth * scale) / 2;
+    const offY = (vr.height - video.videoHeight * scale) / 2;
+
+    const pad = 0.12;                        // 框外稍微多留一点，别卡太死
+    const boxW = br.width / scale;
+    const boxH = br.height / scale;
+    let sx = (br.left - vr.left - offX) / scale - boxW * pad;
+    let sy = (br.top - vr.top - offY) / scale - boxH * pad;
+    let sw = boxW * (1 + pad * 2);
+    let sh = boxH * (1 + pad * 2);
+
+    sx = Math.max(0, Math.min(sx, video.videoWidth - 16));
+    sy = Math.max(0, Math.min(sy, video.videoHeight - 16));
+    sw = Math.min(sw, video.videoWidth - sx);
+    sh = Math.min(sh, video.videoHeight - sy);
+    return { sx, sy, sw, sh };
+  }
+
+  function flashFrame() {
+    frameBox.classList.remove('hit');
+    void frameBox.offsetWidth;   // 强制重排，让动画能重复触发
+    frameBox.classList.add('hit');
+    setTimeout(() => frameBox.classList.remove('hit'), 500);
+  }
+
+  /* ── 导航 ── */
+  $('backHome').addEventListener('click', () => { location.href = '/'; });
+  $('textBack').addEventListener('click', () => { showMode('camera'); startCamera(); });
+  $('textHome').addEventListener('click', () => { location.href = '/'; });
+  $('toText').addEventListener('click', () => { showMode('text'); textEl.focus(); });
+
+  $('shareBtn').addEventListener('click', share);
+  $('shareBtn2').addEventListener('click', share);
+  $('newChannel').addEventListener('click', createChannel);
+  $('newChannel2').addEventListener('click', createChannel);
+
+  $('stopCam').addEventListener('click', () => {
+    stopCamera();
+    setStatus('', '已停止');
+    showNote('已停止扫码', '点下面的按钮重新开始，或返回首页。', { retry: true });
+  });
+  noteBtn.addEventListener('click', () => startCamera());   // 唯一的重试入口
+
+  let debounce = null;
+  textEl.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => upload(textEl.value), 600);
+  });
+  $('sendBtn').addEventListener('click', () => upload(textEl.value, { force: true }));
+
+  /* ── 启动：进页面就建频道并开摄像头；?mode=text 直接进文本输入 ── */
+  (async () => {
+    if (!(await ensureChannel())) {
+      showMode('text');
+      setStatus('err', '创建频道失败');
+      textStatus.textContent = '创建频道失败，请刷新重试';
+      textStatus.className = 'last err';
+      return;
+    }
+    showCode();
+
+    if (new URLSearchParams(location.search).get('mode') === 'text') {
+      showMode('text');
+      textEl.focus();
+      return;
+    }
+
+    showMode('camera');          // 必须先把摄像头容器显示出来
+    const ok = await startCamera();
+    if (!ok) showMode('text');   // 没有摄像头/非 https 时直接退到文本输入
+  })();
+})();
+</script>
+</body>
+</html>

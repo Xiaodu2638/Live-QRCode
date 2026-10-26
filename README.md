@@ -111,20 +111,30 @@ cd Live-QRCode
 
 ### 换成干净地址（不带端口）
 
-默认是 `https://你的地址:8443`。如果宿主机的 443 空闲，把 `.env` 里的 `EDGE_PORT` 改成 `443`：
+默认是 `https://你的地址:8443`（8443 是非特权端口，不会和已有的 80/443 服务抢）。
+如果宿主机 **443 空闲**，把 `.env` 里的 `EDGE_PORT` 改成 `443`：
 
 ```bash
 EDGE_PORT=443
-HTTP_PORT=80
 ```
 
 ```bash
 docker compose up -d --force-recreate
 ```
 
-之后就变成 `https://你的地址/`，并且 `http://你的地址/` 会自动 301 跳到 HTTPS。
+之后就变成 `https://你的地址/`。
 
-> 宿主机和容器用同一个端口号（`${EDGE_PORT}:${EDGE_PORT}`），这样 Caddy 生成的跳转地址不会指错端口；容器内监听端口由 compose 通过 `HTTPS_PORT` 同步传入。
+想让 `http://你的地址/` 自动跳到 HTTPS，再给 `docker-compose.yml` 里 edge 服务的 `ports` 加一行：
+
+```yaml
+      - "80:80"
+```
+
+> **注意端口冲突**：如果宿主机上已经有 nginx / nps / 宝塔 之类的服务占着 80 或 443，
+> 容器会因 `failed to bind host port` 启动失败，表现为站点直接打不开。
+> 先 `ss -lntp | grep -E ":(80|443) "` 确认端口归谁，再决定要不要用这两个端口。
+> 宿主机和容器用同一个端口号（`${EDGE_PORT}:${EDGE_PORT}`），容器内监听端口由 compose
+> 通过 `HTTPS_PORT` 同步传入，这样 Caddy 生成的跳转地址不会指错端口。
 
 ### 安装根证书（IP 模式必须）
 

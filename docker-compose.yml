@@ -31,11 +31,14 @@ services:
   edge:
     image: caddy:2-alpine
     ports:
-      # HTTP：只做 301 跳转到 HTTPS
-      - "${HTTP_PORT:-80}:80"
-      # HTTPS：宿主和容器用同一个端口号（EDGE_PORT），
-      # 这样 Caddy 生成的跳转地址不会指错端口。
-      # 设成 443 就是 https://你的地址/（不带端口）
+      # HTTPS：宿主和容器用同一个端口号（EDGE_PORT），这样 Caddy
+      # 生成的跳转地址不会指错端口。默认 8443 是非特权端口，
+      # 不会和宿主机上已有的 80/443 服务（nginx、nps、宝塔等）抢；
+      # 443 空闲时可以改成 443，地址就变成 https://你的地址/
+      #
+      # 80 端口的 HTTP→HTTPS 跳转是可选项，默认不开（避免抢占 80 导致
+      # 容器启动失败）。需要就在下面加一行：
+      #   - "80:80"
       - "${EDGE_PORT:-8443}:${EDGE_PORT:-8443}"
     environment:
       SITE_HOST: ${SITE_HOST:-localhost}
