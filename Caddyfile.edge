@@ -1,16 +1,26 @@
 # edge 层：只负责 TLS 终结和反向代理，不跑业务
 #
-# 主机名/IP 来自环境变量 SITE_HOST（.env 或 setup.sh 自动填入）。
+# 主机名/IP 来自 SITE_HOST；容器内 HTTPS 监听端口来自 HTTPS_PORT
+# （compose 里由 EDGE_PORT 同步传入，两边永远一致）。
 #
 # 两个关键点：
 #   1) default_sni —— 用 IP 访问时客户端不发 SNI，没有这行 Caddy 选不出证书
 #   2) tls internal —— Let's Encrypt 不给纯 IP 签证书，只能用内部 CA
+#
+# 关掉 Caddy 的自动跳转，改用自己的 :80 块，
+# 这样跳转目标端口跟实际配置一致（默认 8443，改成 443 就跳 443）。
 
 {
 	default_sni {$SITE_HOST:localhost}
+	auto_https disable_redirects
 }
 
-{$SITE_HOST:localhost}:8443 {
+# 明文入口：一律跳 HTTPS
+:80 {
+	redir https://{host}:{$HTTPS_PORT:8443}{uri} permanent
+}
+
+{$SITE_HOST:localhost}:{$HTTPS_PORT:8443} {
 	tls internal
 
 	encode gzip zstd

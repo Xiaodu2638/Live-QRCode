@@ -4,9 +4,10 @@ name: live-qrcode
 services:
   app:
     build: .
-    # 调试直连入口。不想暴露就把这段 ports 删掉，只走 edge
+    # 调试直连入口：只绑本机回环，外部访问不到。
+    # 需要时用 SSH 隧道：ssh -L 48080:127.0.0.1:48080 用户@主机
     ports:
-      - "${HOST_PORT:-48080}:3000"
+      - "127.0.0.1:${HOST_PORT:-48080}:3000"
     volumes:
       # 代码和页面挂载：改宿主机文件即可，不用重新 build
       #   改 public/*.html → 浏览器刷新即生效
@@ -30,9 +31,16 @@ services:
   edge:
     image: caddy:2-alpine
     ports:
-      - "${EDGE_PORT:-8443}:8443"
+      # HTTP：只做 301 跳转到 HTTPS
+      - "${HTTP_PORT:-80}:80"
+      # HTTPS：宿主和容器用同一个端口号（EDGE_PORT），
+      # 这样 Caddy 生成的跳转地址不会指错端口。
+      # 设成 443 就是 https://你的地址/（不带端口）
+      - "${EDGE_PORT:-8443}:${EDGE_PORT:-8443}"
     environment:
       SITE_HOST: ${SITE_HOST:-localhost}
+      # 容器内监听端口，必须和上面的映射一致
+      HTTPS_PORT: ${EDGE_PORT:-8443}
       ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       # IP 模式固定用 Caddyfile.edge；

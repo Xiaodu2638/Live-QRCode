@@ -109,6 +109,23 @@ cd Live-QRCode
     https://203.0.113.10:8443/ca.crt
 ```
 
+### 换成干净地址（不带端口）
+
+默认是 `https://你的地址:8443`。如果宿主机的 443 空闲，把 `.env` 里的 `EDGE_PORT` 改成 `443`：
+
+```bash
+EDGE_PORT=443
+HTTP_PORT=80
+```
+
+```bash
+docker compose up -d --force-recreate
+```
+
+之后就变成 `https://你的地址/`，并且 `http://你的地址/` 会自动 301 跳到 HTTPS。
+
+> 宿主机和容器用同一个端口号（`${EDGE_PORT}:${EDGE_PORT}`），这样 Caddy 生成的跳转地址不会指错端口；容器内监听端口由 compose 通过 `HTTPS_PORT` 同步传入。
+
 ### 安装根证书（IP 模式必须）
 
 **为什么必须装**：浏览器只在**安全上下文**（`https://` 或 `localhost`）下允许调用摄像头。IP 模式用的是自签证书，不装根证书浏览器会拦，扫码功能直接不可用。
@@ -180,8 +197,9 @@ docker compose up -d --build
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `SITE_HOST` | 必填 | 对外访问用的 IP 或域名，决定证书签给谁 |
-| `EDGE_PORT` | `8443` | 宿主机映射到 edge 的端口（容器内固定 8443） |
-| `HOST_PORT` | `48080` | 宿主机映射到 app 的端口，仅调试用 |
+| `EDGE_PORT` | `8443` | HTTPS 端口，宿主机与容器同号。设为 `443` 就能用 `https://你的地址/` |
+| `HTTP_PORT` | `80` | HTTP 端口，只做 301 跳转到 HTTPS |
+| `HOST_PORT` | `48080` | app 调试端口，**只绑 127.0.0.1**，外部访问不到 |
 | `CHANNEL_TTL_SECONDS` | `1800` | 频道无上传多久后过期（60–86400） |
 | `CLEANUP_INTERVAL_SECONDS` | `60` | 后台清理间隔（10–3600） |
 | `UPLOAD_RATE_LIMIT` | `2` | 每频道每秒最大上传次数（1–100） |
