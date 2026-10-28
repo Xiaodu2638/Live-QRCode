@@ -206,27 +206,63 @@ FILES="-f docker-compose.yml"
 if [ "$CADDY_MODE" = "domain" ]; then
   FILES="$FILES -f docker-compose.domain.yml"
 fi
+FS="$FILES"
+
+# 部署前先校验 Caddyfile，避免带着坏配置启动后陷入重启循环
+CADDYFILE="./Caddyfile.edge"
+if [ "$CADDY_MODE" = "domain" ]; then
+  CADDYFILE="./Caddyfile.domain"
+fi
+
+say "· 校验 Caddy 配置（${CADDYFILE}）…"
+if ! $DOCKER run --rm \
+     -e SITE_HOST="${SITE_HOST}" \
+     -e HTTPS_PORT="${EDGE_PORT}" \
+     -e ACME_EMAIL="${ACME_EMAIL}" \
+     -v "$(pwd)/${CADDYFILE#./}:/etc/caddy/Caddyfile:ro" \
+     caddy:2-alpine \
+     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
+     >"$PWD/.caddy-validate.log" 2>&1; then
+  say "✗ Caddy 配置校验失败："
+  sed 's/^/    /' "$PWD/.caddy-validate.log"
+  exit 1
+fi
+say "  ✓ 配置有效"
 
 say "· 构建并启动容器…"
-$DOCKER compose $FILES up -d --build
+# --force-recreate: 切换 IP/域名模式时必须重建，否则会残留旧的 Caddyfile 挂载
+$DOCKER compose $FILES up -d --build --remove-orphans --force-recreate
 
 say "· 等待服务就绪…"
+
+# 1) 先确认 edge 容器真的在跑（不是 Restarting）
 i=0
-while [ "$i" -lt 60 ]; do
-  if curl -fsS --max-time 2 "http://127.0.0.1:${HOST_PORT}/healthz" >/dev/null 2>&1; then
+while [ "$i" -lt 90 ]; do
+  _st=$($DOCKER compose $FS ps --format '{{.Service}} {{.State}}' 2>/dev/null | awk '$1=="edge"{print $2}')
+  [ "$_st" = "running" ] && break
+  i=$((i + 1))
+  sleep 1
+done
+
+# 2) 再验证对外 HTTPS 入口 —— 这才是用户真正访问的路径
+_ok=0
+i=0
+while [ "$i" -lt 90 ]; do
+  if curl -fsSk --max-time 3 --resolve "${SITE_HOST}:${EDGE_PORT}:127.0.0.1" \
+       "https://${SITE_HOST}:${EDGE_PORT}/healthz" >/dev/null 2>&1; then
+    _ok=1
     break
   fi
   i=$((i + 1))
   sleep 1
 done
 
-if [ "$i" -ge 60 ]; then
+if [ "$_ok" != "1" ]; then
   say ""
-  say "✗ 60 秒内没有就绪，看日志："
-  say "    $DOCKER compose $FILES logs --tail=50"
+  say "✗ 90 秒内对外入口没有就绪，最近日志："
+  $DOCKER compose $FS logs --tail=60 edge 2>&1 | sed 's/^/    /'
   exit 1
 fi
-
 say ""
 say "  部署完成"
 hr

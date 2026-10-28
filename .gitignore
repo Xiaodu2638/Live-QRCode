@@ -5,3 +5,6 @@ node_modules
 
 # 本地部署覆盖（含端口、路径等与本机相关的设置），不进版本库
 docker-compose.override.yml
+
+# 安装脚本生成的临时备份
+*.bak-*
