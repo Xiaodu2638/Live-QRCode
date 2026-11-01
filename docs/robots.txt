@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xiaodu2638.github.io/Live-QRCode/sitemap.xml
