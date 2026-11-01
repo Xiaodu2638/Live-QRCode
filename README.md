@@ -2,6 +2,8 @@
 
 把手机上的内容"扫"到另一块屏幕上 —— 一个临时的二维码信道。
 
+> **在线演示(宣传页)**:<https://xiaodu2638.github.io/Live-QRCode/> —— 托管在本仓库 `docs/` 目录,由 GitHub Pages 自动发布。
+
 手机扫码（或手输文本）→ 服务端实时中转 → 另一台设备的网页上立刻渲染成二维码，再用别的设备扫走。
 
 ```
@@ -39,6 +41,10 @@
 │   ├── favicon.svg
 │   ├── apple-touch-icon.png
 │   └── vendor/jsQR.js            # 二维码解码库（内联，不依赖 CDN）
+├── docs/                           # 宣传页（GitHub Pages 托管）
+│   ├── index.html                # https://xiaodu2638.github.io/Live-QRCode/
+│   ├── qr.svg                    # 指向仓库的可扫二维码
+│   └── favicon.svg
 ├── Dockerfile                    # 应用镜像
 ├── docker-compose.yml            # app + edge 两个服务
 ├── docker-compose.domain.yml     # 域名模式覆盖（80/443 + Caddyfile.domain）
