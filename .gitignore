@@ -8,3 +8,7 @@ docker-compose.override.yml
 
 # 安装脚本生成的临时备份
 *.bak-*
+
+# 视频制作相关(渲染帧、合成稿、临时脚本),不进版本库
+promo-video/
+*.mp4
